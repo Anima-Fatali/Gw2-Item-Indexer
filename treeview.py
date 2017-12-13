@@ -17,6 +17,7 @@ global g
 g = 0
 
 global tree
+tree = None
 global vsb
 
 #name is the parent, itemID is the item to be added.
@@ -54,7 +55,11 @@ def addChild(parentName, itemID, tree):
                     tree.insert(parentName, 1, name + str(g), text=name, values=('0', count, '0', '0'))
                     if api_requests.isCraftable(item_ID):
                         addChild(name + str(g), item_ID, tree)
+    
 
+def getTree():
+    global tree
+    return tree
 
 def createTree(parent, itemID, craftable):
     start = time.time()
@@ -62,8 +67,8 @@ def createTree(parent, itemID, craftable):
     global state
     global tree
     global vsb
-    
-    if craftable:    
+
+    if craftable:  
         if state is True:
             state = False
             tree.pack_forget()
@@ -71,29 +76,33 @@ def createTree(parent, itemID, craftable):
             return
 
         tree = Treeview(parent)
-    
+        
         vsb = Scrollbar(parent, orient="vertical", command=tree.yview)
         vsb.pack(side='right', fill='y')
         tree.configure(yscrollcommand=vsb.set)
-    
+        
         tree['columns']=('one','two','three', 'four')
-        tree.column('one', width=10)
-        tree.column('two', width=10)
-        tree.column('three', width=50)
-        tree.column('four', width=50)
+        tree.column('one', width=75)
+        tree.column('two', width=75)
+        tree.column('three', width=100)
+        tree.column('four', width=100)
+        tree.heading('one', text='Owned')
+        tree.heading('two', text='Required')
+        tree.heading('three', text='Sell Listing')
+        tree.heading('four', text='Buy Listing')
 
-       
+           
 
-    
+        
         recipeJSON = api_requests.requestRecipe(itemID)
         itemJSON = api_requests.requestItemByID(itemID)
 
         if itemJSON:
             for i in itemJSON:
                 name = i['name']
-                
+                    
             tree.insert('', 1, 'itemHead', text = name)
-                
+                    
         if recipeJSON:
             for i in recipeJSON['ingredients']:
                 itemID = i['item_id']
@@ -106,7 +115,7 @@ def createTree(parent, itemID, craftable):
                 #Need to add method that pulls from api the ammount of item owned
                 tree.insert('itemHead', 1, name, text=name, values=('0', count))
                 #print("itemHead child = " + name)
-                    
+                        
         for each in tree.get_children():
             temp = tree.get_children(each)
             y = 0
@@ -125,15 +134,17 @@ def createTree(parent, itemID, craftable):
                 if api_requests.isCraftable(itemID):
                     #print('Name : ' + name)
                     addChild(name, itemID, tree)
-       
+         
             z += 1
 
-        
+            
         state = True
         tree.pack()
 
-    os.remove('./temp.csv')
-    os.remove('./temp.db')
+    if(os.path.isfile('./temp.csv') is True):
+        os.remove('./temp.csv')
+    if(os.path.isfile('./temp.db') is True):
+        os.remove('./temp.db')
 
     end = time.time()
     print(end-start)

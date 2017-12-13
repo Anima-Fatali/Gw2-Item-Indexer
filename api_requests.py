@@ -151,7 +151,7 @@ def requestItem(searchGet):
 
         conn.row_factory = lambda cursor, row: row[0]   #prevents fetchall() from return a tuple
         cur = conn.cursor()
-        stringtemp = 'select itemID from itemIndex where nameOfItem like "' + itemName + '" limit 1'
+        stringtemp = 'select itemID from itemIndex where name like "' + itemName + '" limit 1'
         #print(stringtemp)
         cur.execute(stringtemp)
         id = cur.fetchall()
@@ -233,6 +233,10 @@ def updateDatabase():
     except Error as e:
         print(e)
 
+#materials = requests.get('https://api.guildwars2.com/v2/account/materials?access_token=' + API_KEY)
+
+#-------------UPDATES ITEMS--------------------------------------------------------
+
     conn.row_factory = lambda cursor, row: row[0]   #prevents fetchall() from return a tuple
     cur = conn.cursor()
     cur.execute('select itemID from itemIndex')
@@ -242,12 +246,11 @@ def updateDatabase():
 
 
     url = 'https://api.guildwars2.com/v2/items'
-    try:
-        temp = urllib.request.urlopen(url).read().decode('utf-8')
-        newItems = json.loads(temp)
-    except:
-        pass
+    newItems = requests.get(url).json()
+
     diff = set(currentItems) ^ set(newItems) #XOR to get the values that are different
+
+    print(diff)
 
     array = list(diff)
     
@@ -262,13 +265,14 @@ def updateDatabase():
 
     j = 0
 
-    csvfile = open("file.csv", 'w', newline = '')
+    csvfile = open("updateItems.csv", 'w', newline = '')
 
     f = csv.writer(csvfile)
 
+    print(length)
     while j < (length):
         x = 0
-        request_string = 'items?ids='
+        request_string = 'https://api.guildwars2.com/v2/items?ids='
         #While loop that creates a request_string of 200 items
         while x < 200 and j < (length - modlen):
             request_string += str(array[j])
@@ -276,11 +280,16 @@ def updateDatabase():
                 request_string += ','
             j += 1
             x += 1
+        id1 = requests.get(request_string).json()
+        if id1:
+            for i in id1:
+                f.writerow([i['name'],i['id'],i['type'],i['level'],
+                        i['rarity'],i['vendor_value'],i['chat_link'],
+                        i['icon']])
 
-        if j > (length - modlen):
-            writeItemstoDB(id1, f)    
+
+        if j >= (length - modlen):  
             x = 0
-            request_string = 'items?ids='
             #While loop that creates a request_string with the amount leftover that is under 200
             while x < (modlen) and j < length:
                 request_string += str(array[j])
@@ -288,39 +297,116 @@ def updateDatabase():
                     request_string += ','
                 j += 1
                 x += 1
-        id1 = request(request_string)
-        writeItemstoDB(id1, f)
+        id1 = requests.get(request_string).json()
+        if id1:
+            for i in id1:
+                f.writerow([i['name'],i['id'],i['type'],i['level'],
+                        i['rarity'],i['vendor_value'],i['chat_link'],
+                        i['icon']])
         
     csvfile.close()
-    readfile = open('file.csv')
+    readfile = open('updateItems.csv')
     csvReader = csv.reader(readfile)
 
-    #cur.execute('create table itemIndex(itemID integer primary key, nameOfItem TEXT);')
-
     for row in csvReader:
-        igloo = row[1]
-        cur.execute('select itemID from itemIndex WHERE itemID = (?);', (igloo,))
-        bug = cur.fetchall()
-
-
-        emptylist = []
-        
-        if bug is not emptylist:
-            string = 'Updated'
-            cur.execute('insert into itemIndex (nameofItem, itemID) values (?, ?);', row)
+        try:
+            cur.execute('insert into itemIndex (name, itemID, type, level, rarity, vendor_value, chat_link, icon) values (?, ?, ?, ?, ?, ?, ?, ?);', row)
+        except Error as e:
+            print(e)
+        print(cur.fetchall())
 
     readfile.close()
     
     cursor = conn.execute('select * from itemIndex;')
     conn.commit()
     print("Committed")
+
+
+#-----------------------------------------------UPDATE RECIPES---------------------------------------------
+    cur.execute('select recipeID from recipeIndex')
+    currentItems = cur.fetchall()
+    
+    url = 'https://api.guildwars2.com/v2/recipes'
+    newItems = requests.get(url).json()
+
+    diff2 = set(currentItems) ^ set(newItems) #XOR to get the values that are different
+
+    print(diff2)
+
+    array = list(diff2)
+    
+    length = len(array)    
+
+    modlen = (length % 200)
+
+    if modlen < 200:
+        modlen = 0
+
+    id1 = None
+
+    j = 0
+
+    csvfile = open("updateRecipes.csv", 'w', newline = '')
+
+    f = csv.writer(csvfile)
+
+    print(length)
+    while j < (length):
+        x = 0
+        request_string = 'https://api.guildwars2.com/v2/recipes?ids='
+        #While loop that creates a request_string of 200 items
+        while x < 200 and j < (length - modlen):
+            request_string += str(array[j])
+            if x != 199:
+                request_string += ','
+            j += 1
+            x += 1
+        id1 = requests.get(request_string).json()
+        if id1:
+            for i in id1:
+                f.writerow([i['id'],i['output_item_id']])
+
+
+        if j >= (length - modlen):  
+            x = 0
+            #While loop that creates a request_string with the amount leftover that is under 200
+            while x < (modlen) and j < length:
+                request_string += str(array[j])
+                if x != length:
+                    request_string += ','
+                j += 1
+                x += 1
+        id1 = requests.get(request_string).json()
+        if id1:
+            for i in id1:
+                f.writerow([i['id'],i['output_item_id']])
+        
+    csvfile.close()
+    readfile = open('updateREcipes.csv')
+    csvReader = csv.reader(readfile)
+
+    for row in csvReader:
+        try:
+            cur.execute('insert into recipeIndex (recipeID, itemID) values (?, ?);', row)
+        except Error as e:
+            print(e)
+        print(cur.fetchall())
+
+    readfile.close()
+    
+    conn.commit()
+    print("Committed")
+    if diff or diff2:
+        string = 'Database Updated'
     return (string)
 
+
 #writes to the CSVfile
-def writeItemstoDB(id1, f):
+def writeItemstoItemsCSV(id1, f):
     if id1:
        for i in id1:
-            f.writerow([i['name'],i['id']])
+            print(i)
+            f.writerow([i['name'],i['id'],i['type'],i['level'],i['rarity'],i['vendor_value'],i['chat_link'],i['icon']])
 
 
 def isCraftable(itemID):
@@ -331,7 +417,10 @@ def isCraftable(itemID):
 
     cur = conn.cursor()
 
-    cur.execute('select recipeID from recipeIndex where itemID like ' + str(itemID))
+    try:
+        cur.execute('select recipeID from recipeIndex where itemID like ' + str(itemID))        
+    except Error as e:
+        print(e) 
     if cur.fetchall():
         craftable = True
     else:
